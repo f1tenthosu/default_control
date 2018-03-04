@@ -58,7 +58,7 @@ void calculateAngleDistance(double A,double B,double &ang, double &dist)
 
 void callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
-//	ROS_INFO("%d",sizeof(msg->ranges));
+	//ROS_INFO("%d",sizeof(msg->ranges));
 	//ROS_INFO("Message received");
 	leftWall.clear();
 	rightWall.clear();
@@ -101,7 +101,7 @@ void callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	}
 
 
-	ROS_INFO("%ld %ld",leftWall.size(),rightWall.size());
+	ROS_INFO("LWsize:%u RWsize:%u",leftWall.size(),rightWall.size());
 
 	control::sideWay side;
 	control::angleDistanceError error;
