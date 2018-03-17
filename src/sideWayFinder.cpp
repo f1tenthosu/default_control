@@ -8,6 +8,8 @@
 #define dataSize (1081)
 #define validSize (150) 
 #define ratio (1)//(7.525)
+#define frontCheckDist (0.75 * ratio) // emergency front check distance
+#define sideCheckDist (0.3 * ratio) // emegecy side check distance
 typedef struct
 {
 	double x,y;
@@ -56,10 +58,35 @@ void calculateAngleDistance(double A,double B,double &ang, double &dist)
 	ang = ang*180/3.14159265;
 }
 
+// True: stop False: Go on
+bool checkEmergency(double Fdist, double &Ldist, double &Rdist, double &ang) {
+	double theta = ang * M_PI / 180;
+		
+	ROS_INFO("Fdist = %0.2lf, frontCheckDist = %0.2lf", Fdist, frontCheckDist);
+	ROS_INFO((ang > 0) ? "Left Turn" : "Right Turn");
+	ROS_INFO("sideCheckDist = %0.2lf", sideCheckDist);
+	ROS_INFO("left = %0.2lf, right = %0.2lf", Ldist/cos(theta) - frontCheckDist*tan(theta), -(Rdist/cos(theta)) + frontCheckDist*tan(theta));
+	
+	if (Fdist < frontCheckDist) return true;
+	if (Ldist < sideCheckDist || -Rdist < sideCheckDist) return true;
+	if (theta > 0) {
+		//ROS_INFO("yes left");
+		if (Ldist/cos(theta) - frontCheckDist*tan(theta) < sideCheckDist)
+			return true;
+	} else {
+		//ROS_INFO("yes right");
+		if (-(Rdist/cos(theta)) + frontCheckDist*tan(theta) < sideCheckDist)
+			return true;
+	}
+	//ROS_INFO("yes check");
+	return false;
+}
+
 void callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
 	//ROS_INFO("%d",sizeof(msg->ranges));
 	//ROS_INFO("Message received");
+	ROS_INFO("-------------------------");
 	leftWall.clear();
 	rightWall.clear();
 
@@ -101,7 +128,7 @@ void callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	}
 
 
-	ROS_INFO("LWsize:%u RWsize:%u",leftWall.size(),rightWall.size());
+	ROS_INFO("leftWall.size():%u rightWall.size():%u",leftWall.size(),rightWall.size());
 
 	control::sideWay side;
 	control::angleDistanceError error;
@@ -147,7 +174,11 @@ void callback(const sensor_msgs::LaserScan::ConstPtr& msg)
 	pid_error.pid_error =(error.dist/ratio+error.ang/45*1.5)*100;
 	pid_error.pid_vel = 9*ratio;
 	if (pid_error.pid_vel<2*ratio) pid_error.pid_vel=2*ratio;
-
+	
+	if (checkEmergency(msg->ranges[540], Ldist, Rdist, error.ang))
+		pid_error.pid_vel = 0.0;
+	ROS_INFO(checkEmergency(msg->ranges[540], Ldist, Rdist, error.ang) ? "Emergency: true" : "Emergency: false");
+	
 	pub.publish(side);
 	pubError.publish(error);
 	pub2Python.publish(pid_error);
